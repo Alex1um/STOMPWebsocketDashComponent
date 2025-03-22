@@ -1,0 +1,11 @@
+include stompws/stompws.min.js
+include stompws/stompws.min.js.map
+include stompws/async-*.js
+include stompws/async-*.js.map
+include stompws/*-shared.js
+include stompws/*-shared.js.map
+include stompws/metadata.json
+include stompws/package-info.json
+include README.md
+include LICENSE
+include package.json
