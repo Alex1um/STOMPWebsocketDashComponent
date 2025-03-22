@@ -45,6 +45,7 @@ const STOMPWebsocket = (props) => {
     if (subscribe !== currentTopicRef.current) {
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
+        currentTopicRef.current = null;
         console.log(`Unsubscribed from ${currentTopicRef.current}`);
       }
       
