@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { Client } from '@stomp/stompjs';
 
 /**
  * ExampleComponent is an example component.
@@ -8,7 +9,7 @@ import PropTypes from 'prop-types';
  * It renders an input with the property `value`
  * which is editable by the user.
  */
-const STOMPWebsocket = ({props}) => {
+const STOMPWebsocket = (props) => {
   const {id, setProps, subscribe, send, url} = props;
   const clientRef = useRef(null);
   const subscriptionRef = useRef(null);
