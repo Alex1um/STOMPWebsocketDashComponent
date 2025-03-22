@@ -2,7 +2,7 @@
 name = "Stompws"
 uuid = "1b08a953-4be3-4667-9a23-f1459f702aa5"
 authors = ["Alex Anderson <ye4h@pm.me>"]
-version = "0.0.4"
+version = "0.0.5"
 
 [deps]
 Dash = "1b08a953-4be3-4667-9a23-3db579824955"

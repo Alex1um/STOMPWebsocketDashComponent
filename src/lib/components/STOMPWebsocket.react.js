@@ -20,7 +20,7 @@ const STOMPWebsocket = (props) => {
     const stompClient = new Client({
       brokerURL: url,
       reconnectDelay: 5000,
-      debug: (str) => console.debug(`STOMP: ${str}`),
+      logRawCommunication: false,
     });
 
     stompClient.onConnect = () => {
