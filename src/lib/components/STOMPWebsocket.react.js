@@ -1,6 +1,98 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Client } from '@stomp/stompjs';
+
+
+function useStompJs(url) {
+  const [lastMessage, setLastMessage] = useState(null);
+  const [readyState, setReadyState] = useState({});
+  const stompClientRef = useRef(null);
+  const startRef = useRef(() => void 0);
+  const messageQueue = useRef([]);
+  const convertedUrl = useRef(null);
+  
+  const sendMessage = useCallback((message) => {
+    if (message && stompClientRef.current?.connected) {
+      const { destination, body, headers = {} } = message;
+      stompClientRef.current.publish({
+        destination,
+        body: JSON.stringify(body),
+        headers
+      });
+    }
+  }, []);
+
+  const sendJsonMessage = useCallback((message) => {
+    message.body = JSON.stringify(message.body);
+    sendMessage(message);
+  }, [sendMessage]);
+
+  useEffect(() => {
+    if (url !== null) {
+      let removeListeners;
+      let expectClose = false;
+      let createOrJoin = true;
+
+      const start = async () => {
+        convertedUrl.current = url;
+
+        const protectedSetLastMessage = (message) => {
+          if (!expectClose) {
+            flushSync(() => setLastMessage(message));
+          }
+        };
+
+        const protectedSetReadyState = (state) => {
+          if (!expectClose) {
+            flushSync(() => setReadyState(prev => ({
+              ...prev,
+              ...(convertedUrl.current && { [convertedUrl.current]: state }),
+            })));
+          }
+        };
+
+        if (createOrJoin) {
+          removeListeners = createOrJoinSocket(
+            webSocketRef,
+            convertedUrl.current,
+            protectedSetReadyState,
+            optionsCache,
+            protectedSetLastMessage,
+            startRef,
+            reconnectCount,
+            lastMessageTime,
+            sendMessage,
+          );
+        }
+      };
+
+      startRef.current = () => {
+        if (!expectClose) {
+          if (webSocketProxy.current) webSocketProxy.current = null;
+          removeListeners?.();
+          start();
+        }
+      };
+
+      start();
+      return () => {
+        expectClose = true;
+        createOrJoin = false;
+        if (webSocketProxy.current) webSocketProxy.current = null;
+        removeListeners?.();
+        setLastMessage(null);
+      };
+    } else if (url === null || connect === false) {
+      reconnectCount.current = 0; // reset reconnection attempts
+      setReadyState(prev => ({
+        ...prev,
+        ...(convertedUrl.current && { [convertedUrl.current]: ReadyState.CLOSED }),
+      }));
+    }
+  }, [url, sendMessage]);
+}
+
 
 /**
  * ExampleComponent is an example component.
@@ -10,34 +102,52 @@ import { Client } from '@stomp/stompjs';
  * which is editable by the user.
  */
 const STOMPWebsocket = (props) => {
-  const {id, setProps, subscribe, send, url} = props;
+  const {id, setProps, subscribe, send, url, message} = props;
   const clientRef = useRef(null);
   const subscriptionRef = useRef(null);
   const currentTopicRef = useRef('');
+  const [rawMessage, setRawMessage] = useState();
+    
+  const stompClient = new Client({
+    brokerURL: url,
+    reconnectDelay: 5000,
+    logRawCommunication: false,
+  });
+
+  stompClient.onConnect = () => {
+    console.log('STOMP Connected');
+    // Subscribe to initial topic if exists
+    if (subscribe) {
+      subscribeToTopic(subscribe);
+    }
+  };
+
+  stompClient.activate();
+  clientRef.current = stompClient;
 
   // Initialize STOMP client once when component mounts
   useEffect(() => {
-    const stompClient = new Client({
-      brokerURL: url,
-      reconnectDelay: 5000,
-      logRawCommunication: false,
-    });
+    // const stompClient = new Client({
+    //   brokerURL: url,
+    //   reconnectDelay: 5000,
+    //   logRawCommunication: false,
+    // });
 
-    stompClient.onConnect = () => {
-      console.log('STOMP Connected');
-      // Subscribe to initial topic if exists
-      if (subscribe) {
-        subscribeToTopic(subscribe);
-      }
-    };
+    // stompClient.onConnect = () => {
+    //   console.log('STOMP Connected');
+    //   // Subscribe to initial topic if exists
+    //   if (subscribe) {
+    //     subscribeToTopic(subscribe);
+    //   }
+    // };
 
-    stompClient.activate();
-    clientRef.current = stompClient;
+    // stompClient.activate();
+    // clientRef.current = stompClient;
 
-    return () => {
-      stompClient.deactivate();
-      console.log('STOMP Disconnected');
-    };
+    // return () => {
+    //   stompClient.deactivate();
+    //   console.log('STOMP Disconnected');
+    // };
   }, []); // Empty dependency array ensures this runs only once
 
   // Handle subscription changes
@@ -83,12 +193,23 @@ const STOMPWebsocket = (props) => {
   const handleMessage = (rawMessage) => {
     try {
       const parsedMessage = JSON.parse(rawMessage.body);
-      setProps({ message: parsedMessage });
+      setRawMessage({"data": rawMessage});
     } catch (error) {
       console.error('Message parsing error:', error);
-      setProps({ message: null });
+      setRawMessage(null);
+      // setProps({ message: null });
     }
   };
+
+  useEffect(() => {
+    if (rawMessage) {
+      let data = rawMessage.data;
+      setProps({ message: data });
+      return () => {
+        data.destroy();
+      }
+    }
+  }, [rawMessage]);
   
   return <div />;
 };
