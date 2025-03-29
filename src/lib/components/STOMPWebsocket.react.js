@@ -90,14 +90,11 @@ const STOMPWebsocket = (props) => {
     }
   };
 
+  // Clear message object when message unused
   useEffect(() => {
-    if (message) {
-      console.log(message)
-    }
     return () => {
       if (message) {
         Object.keys(message).forEach(key => delete message[key])
-        console.log(message)
       }
     }
   }, [message]);

@@ -36,14 +36,6 @@ def subscribe(value):
 def unsubscribe(value):
     return None, None
 
-# @callback(
-#     Output("input", "clear"),
-#     Input("clear", "n_clicks"),
-#     prevent_initial_call=True,
-# )
-# def clear(value):
-#     return True
-
 @callback(Output("output", "children", allow_duplicate=True), Input("input", "message"), prevent_initial_call=True)
 def display_output(value):
     return json.dumps(value)
