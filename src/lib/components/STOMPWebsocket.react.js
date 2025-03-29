@@ -3,15 +3,111 @@ import { flushSync } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Client } from '@stomp/stompjs';
 
+const cleanSubscribers = (
+  url,
+  subscriber,
+  clearSocketIoPingInterval,
+) => {
+  return () => {
+    removeSubscriber(url, subscriber);
+    if (!hasSubscribers(url)) {
+      try {
+        const socketLike = sharedWebSockets[url];
+        if (socketLike instanceof WebSocket) {
+          socketLike.onclose = (event: WebSocketEventMap['close']) => {
+            if (optionsRef.current.onClose) {
+              optionsRef.current.onClose(event);
+            }
+            setReadyState(ReadyState.CLOSED);
+          };
+        }
+        socketLike.close();
+      } catch (e) {
+
+      }
+      if (clearSocketIoPingInterval) clearSocketIoPingInterval();
+
+      delete sharedWebSockets[url];
+    }
+  }
+};
+
+
+const createOrJoinSocket = (
+  stompClientRef,
+  url,
+  setLastMessage,
+  startRef,
+  sendMessage,
+) => {
+  if (optionsRef.current.share) {
+    let clearSocketIoPingInterval: ((() => void) | null) = null;
+    if (sharedWebSockets[url] === undefined) {
+      sharedWebSockets[url] = optionsRef.current.eventSourceOptions ?
+        new EventSource(url, optionsRef.current.eventSourceOptions) :
+        new WebSocket(url, optionsRef.current.protocols);
+      webSocketRef.current = sharedWebSockets[url];
+      setReadyState(ReadyState.CONNECTING);
+      clearSocketIoPingInterval = attachSharedListeners(
+        sharedWebSockets[url],
+        url,
+        optionsRef,
+        sendMessage,
+      );
+    } else {
+      webSocketRef.current = sharedWebSockets[url];
+      setReadyState(sharedWebSockets[url].readyState);
+    }
+
+    const subscriber: Subscriber = {
+      setLastMessage,
+      setReadyState,
+      optionsRef,
+      reconnectCount,
+      lastMessageTime,
+      reconnect: startRef,
+    };
+
+    addSubscriber(url, subscriber);
+
+    return cleanSubscribers(
+      url,
+      subscriber,
+      optionsRef,
+      setReadyState,
+      clearSocketIoPingInterval,
+    );
+  } else {
+    webSocketRef.current = optionsRef.current.eventSourceOptions ?
+      new EventSource(url, optionsRef.current.eventSourceOptions) :
+      new WebSocket(url, optionsRef.current.protocols);
+    setReadyState(ReadyState.CONNECTING);
+    if (!webSocketRef.current) {
+      throw new Error('WebSocket failed to be created');
+    }
+
+    return attachListeners(
+      webSocketRef.current,
+      {
+        setLastMessage,
+        setReadyState
+      },
+      optionsRef,
+      startRef.current,
+      reconnectCount,
+      lastMessageTime,
+      sendMessage,
+    );
+  }
+};
+
 
 function useStompJs(url) {
   const [lastMessage, setLastMessage] = useState(null);
-  const [readyState, setReadyState] = useState({});
   const stompClientRef = useRef(null);
   const startRef = useRef(() => void 0);
-  const messageQueue = useRef([]);
   const convertedUrl = useRef(null);
-  
+
   const sendMessage = useCallback((message) => {
     if (message && stompClientRef.current?.connected) {
       const { destination, body, headers = {} } = message;
@@ -43,25 +139,12 @@ function useStompJs(url) {
           }
         };
 
-        const protectedSetReadyState = (state) => {
-          if (!expectClose) {
-            flushSync(() => setReadyState(prev => ({
-              ...prev,
-              ...(convertedUrl.current && { [convertedUrl.current]: state }),
-            })));
-          }
-        };
-
         if (createOrJoin) {
           removeListeners = createOrJoinSocket(
-            webSocketRef,
+            stompClientRef,
             convertedUrl.current,
-            protectedSetReadyState,
-            optionsCache,
             protectedSetLastMessage,
             startRef,
-            reconnectCount,
-            lastMessageTime,
             sendMessage,
           );
         }
@@ -69,7 +152,6 @@ function useStompJs(url) {
 
       startRef.current = () => {
         if (!expectClose) {
-          if (webSocketProxy.current) webSocketProxy.current = null;
           removeListeners?.();
           start();
         }
@@ -79,18 +161,18 @@ function useStompJs(url) {
       return () => {
         expectClose = true;
         createOrJoin = false;
-        if (webSocketProxy.current) webSocketProxy.current = null;
         removeListeners?.();
         setLastMessage(null);
       };
-    } else if (url === null || connect === false) {
-      reconnectCount.current = 0; // reset reconnection attempts
-      setReadyState(prev => ({
-        ...prev,
-        ...(convertedUrl.current && { [convertedUrl.current]: ReadyState.CLOSED }),
-      }));
     }
   }, [url, sendMessage]);
+
+  return {
+    sendMessage,
+    sendJsonMessage,
+    lastMessage,
+    getWebSocket,
+  };
 }
 
 
