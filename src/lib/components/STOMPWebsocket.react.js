@@ -10,7 +10,7 @@ import { Client } from '@stomp/stompjs';
  * which is editable by the user.
  */
 const STOMPWebsocket = (props) => {
-  const {id, setProps, subscribe, send, url} = props;
+  const {id, setProps, subscribe, send, url, message} = props;
   const clientRef = useRef(null);
   const subscriptionRef = useRef(null);
   const currentTopicRef = useRef('');
@@ -89,7 +89,19 @@ const STOMPWebsocket = (props) => {
       setProps({ message: null });
     }
   };
-  
+
+  useEffect(() => {
+    if (message) {
+      console.log(message)
+    }
+    return () => {
+      if (message) {
+        Object.keys(message).forEach(key => delete message[key])
+        console.log(message)
+      }
+    }
+  }, [message]);
+
   return <div />;
 };
 

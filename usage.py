@@ -6,13 +6,14 @@ app = Dash(__name__)
 
 app.layout = html.Div(
     [
+        html.Button("subscribe", id="subscribe"),
+        html.Button("unsubscribe", id="unsubscribe"),
+        html.Button("clear", id="clear"),
+        html.Div(id="output"),
         stompws.STOMPWebsocket(
             id="input",
             url="ws://localhost:15674/ws",
         ),
-        html.Button("subscribe", id="subscribe"),
-        html.Button("unsubscribe", id="unsubscribe"),
-        html.Div(id="output"),
     ]
 )
 
@@ -35,6 +36,13 @@ def subscribe(value):
 def unsubscribe(value):
     return None, None
 
+# @callback(
+#     Output("input", "clear"),
+#     Input("clear", "n_clicks"),
+#     prevent_initial_call=True,
+# )
+# def clear(value):
+#     return True
 
 @callback(Output("output", "children", allow_duplicate=True), Input("input", "message"), prevent_initial_call=True)
 def display_output(value):
